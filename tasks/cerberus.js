@@ -54,26 +54,35 @@ module.exports = function(grunt) {
             force: false
         });
 
-        var done = this.async();
-        var sys = require('sys');
-        var exec = require('child_process').exec;
-        var command = 'git clone {{git}} {{dest}}';
-        var clean = this.data.clean;
-        if (typeof(clean) != 'object') clean = [clean];
-        clean.unshift('.git*');
-
         var path = require('path');
         var destFinal = path.resolve(this.data.dest) + '/';
 
-        var files;
+        if (!grunt.file.exists(destFinal)) {
+            var done = this.async();
 
-        var name = this.data.git.substring(this.data.git.lastIndexOf('/'));
-        name = name.substring(1, name.lastIndexOf('.git'));
-        grunt.log.write("Cloning '" + name + "' into '" + this.data.dest + "'... ");
+            var clean = this.data.clean;
+            if (typeof(clean) != 'object') clean = [clean];
+            // Adding git cleanup
+            clean.unshift('.git*');
 
-        command = command.replace('{{git}}', this.data.git).replace('{{dest}}', this.data.dest);
+            // Get git repo name
+            var name = this.data.git.substring(this.data.git.lastIndexOf('/'));
+            name = name.substring(1, name.lastIndexOf('.git'));
+            grunt.log.write("Cloning '" + name + "' into '" + this.data.dest + "'... ");
 
-        function prepare(error, stdout, stderr) {
+            // Build command line
+            var command = 'git clone {{git}} {{dest}}';
+            command = command.replace('{{git}}', this.data.git).replace('{{dest}}', this.data.dest);
+
+            require('child_process').exec(command, cleanup);
+        } else {
+            grunt.fail.warn('Directory exists!');
+        }
+
+        // Cleanup Function
+        function cleanup(error, stdout, stderr) {
+            var files;
+
             grunt.log.ok();
             grunt.log.write('Cleaning files... ');
 
@@ -87,7 +96,7 @@ module.exports = function(grunt) {
                     } catch (e) {
                         grunt.log.error();
                         grunt.verbose.error(e);
-                        grunt.fail.warn('operation failed.');
+                        grunt.fail.warn('Operation failed.');
                     }
                 }
             }
@@ -96,10 +105,6 @@ module.exports = function(grunt) {
             grunt.log.success('Template ready!');
 
             done();
-        }
-
-        if (!grunt.file.exists(destFinal)) {
-            exec(command, prepare);
         }
 
     });
