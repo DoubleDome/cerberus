@@ -49,7 +49,7 @@ module.exports = function(grunt) {
 
 
     grunt.registerMultiTask('generate', 'Create project template from git repo', function() {
-
+        var _this = this;
         var options = this.options({
             force: false
         });
@@ -59,6 +59,8 @@ module.exports = function(grunt) {
 
         if (!grunt.file.exists(destFinal)) {
             var done = this.async();
+            var spawn = require('child_process').spawn;
+
 
             var clean = this.data.clean;
             if (typeof(clean) != 'object') clean = [clean];
@@ -66,21 +68,36 @@ module.exports = function(grunt) {
             clean.unshift('.git*');
 
             // Get git repo name
+
             var name = this.data.git.substring(this.data.git.lastIndexOf('/'));
             name = name.substring(1, name.lastIndexOf('.git'));
-            grunt.log.write("Cloning '" + name + "' into '" + this.data.dest + "'... ");
 
-            // Build command line
-            var command = 'git clone {{git}} {{dest}}';
-            command = command.replace('{{git}}', this.data.git).replace('{{dest}}', this.data.dest);
+            var git = spawn('git', ['clone', this.data.git, this.data.dest]);
 
-            require('child_process').exec(command, cleanup);
+            git.stdout.on('data', function(data) {
+                grunt.log.write("Cloning '" + name + "' into '" + _this.data.dest + "'... ");
+            });
+
+            git.stderr.on('data', function(data) {
+                grunt.log.error(data);
+            });
+
+            git.on('close', function(code) {
+                if (code === 0) {
+                    cleanup(destFinal);
+                } else {
+                    grunt.log.error('Exit with error code: ' + code);
+                }
+            });
+
+            //'git add {{build}}/*';
         } else {
             grunt.fail.warn('Directory exists!');
         }
 
         // Cleanup Function
-        function cleanup(error, stdout, stderr) {
+
+        function cleanup(target) {
             var files;
 
             grunt.log.ok();
@@ -88,7 +105,7 @@ module.exports = function(grunt) {
 
             // Clean
             for (var i = 0; i < clean.length; i++) {
-                files = grunt.file.expand(destFinal + clean[i]);
+                files = grunt.file.expand(target + clean[i]);
 
                 for (var f = 0; f < files.length; f++) {
                     try {
